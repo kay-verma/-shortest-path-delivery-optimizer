@@ -15,7 +15,7 @@ The Shortest Path Delivery Optimizer is a Spring Boot application that calculate
 * Method: POST
 * URL: /api/delivery
 * Content-Type: application/json
-###Request Body
+### Request Body
 ```json
 {
   "startLocation": {
