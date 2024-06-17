@@ -9,6 +9,10 @@ public class HaversineDistanceCalculator implements DistanceCalculator {
 
     @Override
     public double calculateDistance(Location location1, Location location2) {
+        if (location1 == null || location2 == null) {
+            throw new IllegalArgumentException("Locations cannot be null");
+        }
+
         double lat1 = Math.toRadians(location1.getLatitude());
         double lon1 = Math.toRadians(location1.getLongitude());
         double lat2 = Math.toRadians(location2.getLatitude());
@@ -24,5 +28,4 @@ public class HaversineDistanceCalculator implements DistanceCalculator {
 
         return EARTH_RADIUS * c;
     }
-
 }

@@ -5,6 +5,8 @@ import com.deliveryoptimizer.shortest_path_delivery.model.DeliveryResponse;
 import com.deliveryoptimizer.shortest_path_delivery.model.Location;
 import com.deliveryoptimizer.shortest_path_delivery.service.DeliveryService;
 import com.deliveryoptimizer.shortest_path_delivery.util.DistanceCalculator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +14,8 @@ import java.util.*;
 
 @Service
 public class DeliveryServiceImpl implements DeliveryService {
+    private static final Logger logger = LoggerFactory.getLogger(DeliveryServiceImpl.class);
+
     private final DistanceCalculator distanceCalculator;
 
     @Autowired
@@ -21,34 +25,35 @@ public class DeliveryServiceImpl implements DeliveryService {
 
     @Override
     public DeliveryResponse calculateShortestPath(DeliveryRequest request) {
-        // Validate input
-        validateRequest(request);
+        try {
+            validateRequest(request);
 
-        // Create graph representation
-        Map<Location, Map<Location, Double>> graph = createGraph(request);
+            Map<Location, Map<Location, Double>> graph = createGraph(request);
 
-        // Run Dijkstra's algorithm
-        Map<Location, Double> shortestDistances = dijkstra(graph, request.getStartLocation());
+            Map<Location, Double> shortestDistances = dijkstra(graph, request.getStartLocation());
 
-        // Find shortest path
-        List<Location> shortestPath = findShortestPath(request, shortestDistances);
+            List<Location> shortestPath = findShortestPath(request, shortestDistances);
 
-        // Calculate total time
-        double totalTime = calculateTotalTime(request, shortestPath);
+            double totalTime = calculateTotalTime(request, shortestPath);
 
-        return new DeliveryResponse(shortestPath, totalTime);
+            return new DeliveryResponse(shortestPath, totalTime);
+        } catch (Exception ex) {
+            logger.error("Error occurred while calculating shortest path", ex);
+            throw ex;
+        }
     }
 
     private void validateRequest(DeliveryRequest request) {
-        // Null checks
-        Objects.requireNonNull(request, "DeliveryRequest cannot be null");
-        Objects.requireNonNull(request.getStartLocation(), "Start location cannot be null");
-        Objects.requireNonNull(request.getConsumer1(), "Consumer 1 cannot be null");
-        Objects.requireNonNull(request.getConsumer2(), "Consumer 2 cannot be null");
-        Objects.requireNonNull(request.getRestaurant1(), "Restaurant 1 cannot be null");
-        Objects.requireNonNull(request.getRestaurant2(), "Restaurant 2 cannot be null");
+        if (request == null) {
+            throw new IllegalArgumentException("DeliveryRequest cannot be null");
+        }
 
-        // Edge case: Start location same as consumer or restaurant
+        if (request.getStartLocation() == null || request.getConsumer1() == null ||
+                request.getConsumer2() == null || request.getRestaurant1() == null ||
+                request.getRestaurant2() == null) {
+            throw new IllegalArgumentException("All locations in the request must be non-null");
+        }
+
         if (request.getStartLocation().equals(request.getConsumer1()) ||
                 request.getStartLocation().equals(request.getConsumer2()) ||
                 request.getStartLocation().equals(request.getRestaurant1()) ||
@@ -60,20 +65,24 @@ public class DeliveryServiceImpl implements DeliveryService {
     private Map<Location, Map<Location, Double>> createGraph(DeliveryRequest request) {
         Map<Location, Map<Location, Double>> graph = new HashMap<>();
 
-        // Add vertices
-        graph.put(request.getStartLocation(), new HashMap<>());
-        graph.put(request.getConsumer1(), new HashMap<>());
-        graph.put(request.getConsumer2(), new HashMap<>());
-        graph.put(request.getRestaurant1(), new HashMap<>());
-        graph.put(request.getRestaurant2(), new HashMap<>());
+        addVertex(graph, request.getStartLocation());
+        addVertex(graph, request.getConsumer1());
+        addVertex(graph, request.getConsumer2());
+        addVertex(graph, request.getRestaurant1());
+        addVertex(graph, request.getRestaurant2());
 
-        // Add edges
         addEdge(graph, request.getStartLocation(), request.getRestaurant1());
         addEdge(graph, request.getStartLocation(), request.getRestaurant2());
         addEdge(graph, request.getRestaurant1(), request.getConsumer1());
         addEdge(graph, request.getRestaurant2(), request.getConsumer2());
 
         return graph;
+    }
+
+    private void addVertex(Map<Location, Map<Location, Double>> graph, Location location) {
+        if (!graph.containsKey(location)) {
+            graph.put(location, new HashMap<>());
+        }
     }
 
     private void addEdge(Map<Location, Map<Location, Double>> graph, Location source, Location destination) {
@@ -94,9 +103,11 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         while (!pq.isEmpty()) {
             Location current = pq.poll();
+
             for (Map.Entry<Location, Double> neighbor : graph.get(current).entrySet()) {
                 Location neighborLocation = neighbor.getKey();
                 double distance = neighbor.getValue();
+
                 double newDistance = distances.get(current) + distance;
                 if (newDistance < distances.get(neighborLocation)) {
                     distances.put(neighborLocation, newDistance);
@@ -107,7 +118,6 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         return distances;
     }
-
 
     private List<Location> findShortestPath(DeliveryRequest request, Map<Location, Double> shortestDistances) {
         List<Location> shortestPath = new ArrayList<>();
@@ -136,9 +146,11 @@ public class DeliveryServiceImpl implements DeliveryService {
 
     private double calculateTotalTime(DeliveryRequest request, List<Location> shortestPath) {
         double totalTime = 0;
+
         for (int i = 0; i < shortestPath.size() - 1; i++) {
             Location source = shortestPath.get(i);
             Location destination = shortestPath.get(i + 1);
+
             double distance = distanceCalculator.calculateDistance(source, destination);
             double time = distance / 20.0; // Assuming average speed of 20 km/hr
             totalTime += time;
@@ -149,9 +161,7 @@ public class DeliveryServiceImpl implements DeliveryService {
                 totalTime += request.getPreparationTime2();
             }
         }
+
         return totalTime;
     }
 }
-
-
-
